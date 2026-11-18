@@ -60,9 +60,18 @@ Force error on the N atom (eV/Å) on held-out whole impacts:
 | Test set | n6 | n7 | n8 | n9 | n10 |
 |---|---|---|---|---|---|
 | h34 (17 frames) | 0.464 | 0.514 | 0.511 | 0.429 | 0.426 |
-| late_test (9) | 0.220 | 0.269 | 0.248 | 0.163 | 0.165 |
+| late_clean (4) | 0.272 | 0.373 | 0.349 | 0.229 | 0.232 |
 | dense_test (10, hollow) | 0.718 | 0.186 | 0.208 | 0.213 | 0.236 |
 | val2 (10) | 1.080 | 0.362 | 0.346 | 0.363 | 0.349 |
+
+
+Test sets (whole impacts, because frames of one impact are 5 fs apart and nearly identical):
+- **h34**: 17 frames from impact runs r3 and r4, held out of training.
+- **late_clean**: 4 late-time frames. Only 4 frames, so an indication, not a statistic.
+- **dense_test**: 10 hollow-site frames.
+- **val2**: 10 frames of a second validation set.
+
+A data leak was found and corrected: the original `late_test` set had 9 frames, and 5 of them had been added to the n9/n10 training data by the h34 split script. Their `late_test` errors (0.163 and 0.165 eV/Å) were therefore not held-out numbers. `late_clean` keeps only the 4 frames absent from every training set; there n9/n10 give 0.23 eV/Å, against 0.27 to 0.37 for n6 to n8. The gain on this set is real but smaller than first reported, and with 4 frames it is within noise of n6. h34 (0 of 17 frames in training), dense_test and val2 are clean.
 
 ![test errors](figures/fig3_test_errors.png)
 

@@ -30,13 +30,14 @@ Common settings: omat-0 base, keep-elements, E0s {C: -1.254804, Ar: 0.038912, N:
 | Test set | n6 | n7 | n8 | n9 | n10 |
 |---|---|---|---|---|---|
 | h34 (17 frames, whole impacts r3/r4 held out) | 0.464 | 0.514 | 0.511 | 0.429 | 0.426 |
-| late_test (9) | 0.220 | 0.269 | 0.248 | 0.163 | 0.165 |
+| late_clean (4) | 0.272 | 0.373 | 0.349 | 0.229 | 0.232 |
 | dense_test (10 hollow) | 0.718 | 0.186 | 0.208 | 0.213 | 0.236 |
 | val2 (10) | 1.080 | 0.362 | 0.346 | 0.363 | 0.349 |
 
 All values recomputed on 8 Nov 2026 with `nimpact.py compare` (`table_all_models.txt`). Notes:
 - The large gain from n6 to n7 on dense_test (0.718 to 0.186) and val2 (1.080 to 0.362) comes from the dense hollow frames added for n7. n8 to n10 are within noise of each other on these two sets.
-- On h34 and late_test, n9 and n10 are better than n6-n8 (h34 0.43 vs 0.46-0.51; late_test 0.16 vs 0.22-0.27); n6 is better than n7 and n8 on these two near-contact sets, so the hollow-regime gain was not free.
+- LEAK FOUND (18 Nov 2026): split_h34.py read nimpact_late_test as a source, so 5 of its 9 frames are in v5/v6 (n9, n10 training). The old late_test column (n9 0.163, n10 0.165) was not held-out. late_clean = the 4 frames in no training set (data/nimpact_late_clean, table_late_clean.txt).
+- On h34 (0/17 in training) n9 and n10 are better than n6-n8 (0.43 vs 0.46-0.51). On late_clean (4 frames) n9/n10 0.23 vs n7/n8 0.35-0.37 and n6 0.27: gain over n6 is within noise. n6 is better than n7 and n8 on both near-contact sets, so the hollow-regime gain was not free.
 - n9 and n10 differ by at most 0.023 eV/A on any set.
 - The near-contact top/bridge regime stays at 0.4-0.5 eV/A on the N for all models; roughly 0.15-0.3 eV/A of that is the spin-label ambiguity of Section 2.
 - Late bridge 50 eV frames have energy errors of about +1.5 eV.

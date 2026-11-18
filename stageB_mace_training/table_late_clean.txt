@@ -1,0 +1,5 @@
+n6 late_clean  MACE force error rms: all atoms 0.109   on the N 0.272   C within 3 A of the N 0.132 eV/A
+n7 late_clean  MACE force error rms: all atoms 0.116   on the N 0.373   C within 3 A of the N 0.127 eV/A
+n8 late_clean  MACE force error rms: all atoms 0.109   on the N 0.349   C within 3 A of the N 0.120 eV/A
+n9 late_clean  MACE force error rms: all atoms 0.088   on the N 0.229   C within 3 A of the N 0.101 eV/A
+n10 late_clean  MACE force error rms: all atoms 0.086   on the N 0.232   C within 3 A of the N 0.097 eV/A
