@@ -1,0 +1,17 @@
+*.log
+*.traj
+*.npy
+*.model
+*.pyc
+__pycache__/
+*.env
+*.pem
+*.key
+CH.airebo
+ffield*
+*.pot
+*.dump
+pending.db
+data/ft/
+data/**/traj/
+*.jsonl

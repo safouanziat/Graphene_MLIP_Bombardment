@@ -1,0 +1,2 @@
+defect,method,natoms,E_formation_eV,magmom_muB,cn2,cn3,cn4,steps,converged,minutes
+SW,airebo,50,5.8086,0.00,0,50,0,115,True,3.6

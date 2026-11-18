@@ -1,0 +1,6 @@
+defect,method,natoms,E_formation_eV,magmom_muB,cn2,cn3,cn4,steps,converged,minutes
+V1,airebo,49,7.5854,0.00,1,48,0,17,True,0.6
+SW,airebo,50,6.0225,0.00,0,50,0,87,True,3.3
+V2,airebo,48,8.7807,0.00,0,48,0,15,True,0.6
+adatom,airebo,51,4.2500,0.00,0,49,1,46,True,1.7
+frenkel,airebo,50,15.0593,0.00,3,46,0,17,True,0.7
