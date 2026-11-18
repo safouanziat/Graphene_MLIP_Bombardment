@@ -1,27 +1,47 @@
-# Graphene_MLIP_Bombardment
+# Replacing AIREBO with a fine-tuned MACE potential for ion bombardment of graphene: a DFT-checked study
 
-Can a fine-tuned machine-learning interatomic potential (MACE) replace AIREBO for ion bombardment of graphene, with DFT as the ground truth?
+Safouan Ziat, Ph.D. · work in progress, November 2026
 
-This repository holds the scripts, the DFT-labelled databases and the result notes of that study. It is a work in progress: stages A to D are done, the limits are listed openly at the end.
+## Summary
 
-![pipeline](figures/fig1_pipeline.png)
+Classical bond-order potentials such as AIREBO are the standard tool for simulating ion irradiation of graphene, but they were fitted near equilibrium, and an impact is anything but. This study asks whether a foundation machine-learning potential (MACE omat-0), fine-tuned on a few hundred GPAW DFT frames, can do better, and uses DFT as the judge throughout.
 
-## Why
+Main findings:
 
-Ion irradiation of graphene (vacancies, doping with N) is usually simulated with classical potentials such as AIREBO. They are fast, but they were fitted near equilibrium. Impacts probe short distances, bond breaking and unusual coordination, which is where classical potentials are least trustworthy. A foundation MLIP fine-tuned on a few hundred DFT frames can be checked against DFT directly. The question is where it helps and where it still fails.
+1. **AIREBO's defect energetics are off by up to 2.2 eV** against DFT, and its Stone-Wales defect has two rippled minima where DFT has one flat structure (Figure 3).
+2. **The fine-tuned model halves the force error on impact frames** (0.42 against 1.11 eV/Å for AIREBO+ZBL) and lowers the carbon displacement threshold from 25–26 eV to 20–21 eV, which moves the Ar vacancy threshold by about 25 %.
+3. **For nitrogen, where AIREBO has no parameters here, the model passes a held-out test** at 0.43 eV/Å on the N atom (Figure 4). It predicts that N at a top site always replaces a carbon atom, and that N at a hollow site is transmitted from 30 eV (Figure 5).
+4. **The weak points are specific**: the top-site channel runs through N-C distances that DFT never checked, formation energies of N-containing defects are off by 0.2 to 0.5 eV, and a spinless model cannot go below a 0.25 to 0.5 eV/Å error near contact.
 
-## The four stages
+Everything is open: scripts, the DFT-labelled databases, result notes and figures. Model weights are not included.
 
-| Stage | Question | Result |
-|---|---|---|
-| A | Can AIREBO be trusted for defects? | Formation energies of V1, V2, Stone-Wales, adatom and Frenkel pair against GPAW PBE |
-| B | Can MACE omat-0 be fine-tuned to DFT labels for C and Ar? | Force error on impact frames 0.42 eV/Å (MACE) against 1.11 eV/Å (AIREBO+ZBL) |
-| C | Do paired Ar impacts differ between the two potentials? | Yes: different vacancy thresholds, traced to the C displacement threshold |
-| D | Can the model handle N, for which AIREBO has no parameters here? | Tested against DFT on held-out whole impacts; committee of 5 runs per case |
+## 1. Why this question
 
-### Stage A: AIREBO against DFT (4×4 cell, eV)
+In an ion-irradiation simulation the interesting events last a few femtoseconds. Atoms come within 1 Å of each other, bonds break and re-form in unusual coordination, and a few tenths of an eV decide whether a carbon atom leaves the sheet. A potential fitted to equilibrium properties has no reason to be right there. A foundation MLIP trained on millions of DFT calculations starts closer to the truth, and fine-tuning can fix its remaining errors, but only if the training frames cover the right configurations and the labels are consistent. The study therefore has two parts: a pipeline that produces trustworthy DFT labels for collision configurations, and a series of tests that separate what the model has learnt from what it has memorised.
 
-| Defect | AIREBO − DFT |
+## 2. Method
+
+The work runs in four stages (Figure 1): check AIREBO against DFT (A), fine-tune MACE (B), compare the two on paired Ar impacts (C), and extend the model to nitrogen (D).
+
+![Figure 1: the four stages](figures/fig1_pipeline.png)
+
+*Figure 1. The four stages of the study.*
+
+All labels use one DFT recipe (id `8c357474ed`): GPAW, PBE, plane waves at 450 eV, k-point density 5, Fermi-Dirac smearing of 0.05 eV, spin-polarised, 20 Å cell height. Frames are only labelled when atoms are at least 1.0 Å (C-C), 1.1 Å (C-N), 1.0 Å (N-N) and 1.6 Å (Ar-C) apart, the distances at which the setup is considered reliable.
+
+Stage D is a loop (Figure 2): run impacts with the current model, select frames spread over time and energy, remove unphysical atoms, label with DFT, fine-tune again, and test on impacts that were never in the training set. The loop was repeated five times (models n6 to n10).
+
+![Figure 2: the label, fine-tune and test loop](figures/fig2_loop.png)
+
+*Figure 2. The label, fine-tune and test loop used for nitrogen. The sanitise step (orange) was added after DFT failures traced to magnetic free atoms; see section 5.*
+
+Fine-tuning starts from omat-0, keeps the elements C, N and Ar, uses atomic reference energies measured with the same DFT recipe, and weights forces on the projectile more strongly. All data go into training, so the end-of-training errors only measure the fit. The generalisation evidence comes from test sets of **whole impacts** held out of training: frames from one impact are 5 fs apart and nearly identical, so splitting by frame would leak.
+
+## 3. Stage A: AIREBO against DFT
+
+Formation energies of five defects in a 4×4 cell, AIREBO minus DFT:
+
+| Defect | Error (eV) |
 |---|---|
 | Monovacancy V1 | −0.32 |
 | Stone-Wales | +0.17 |
@@ -29,33 +49,47 @@ Ion irradiation of graphene (vacancies, doping with N) is usually simulated with
 | C adatom | −2.23 |
 | Frenkel pair | +0.93 |
 
-The adatom error holds at 5×5. Stone-Wales in a 5×5 cell shows that AIREBO has two rippled minima (5.81 and 6.02 eV, against 5.54 eV in DFT, which is flat). Repeated seeds and cell heights give the same two values, so the difference is not a cell-size effect.
+The adatom error is large and holds at 5×5: AIREBO makes an adatom 2.2 eV too cheap. A plausible cause is the way bond-order potentials switch the C-C interaction off over a fixed window (about 1.7 to 2.0 Å), a known artefact of Tersoff and Brenner-type potentials (Pastewka et al., Phys. Rev. B 78, 161402, 2008). The static DFT push scan shows the same artefact as a force error at those distances. I did not remove the switching function to prove that it is the only cause.
 
-![SW minima](figures/fig6_sw_minima.png)
+The Stone-Wales defect is a different kind of problem. In a 5×5 cell, repeated runs with different seeds and cell heights give two AIREBO minima at 5.81 and 6.02 eV, with different out-of-plane ripples (Figure 3). DFT finds one flat structure at 5.54 eV. The cell height is not the cause. Both numbers are finite-size values and should not be quoted as the isolated Stone-Wales energy, but the comparison is fair because both methods use the same cell.
 
-### Stage B: fine-tuning
+![Figure 3: two Stone-Wales minima in AIREBO](figures/fig6_sw_minima.png)
 
-- DFT recipe `8c357474ed`: GPAW, PBE, plane waves 450 eV, k-density 5, Fermi-Dirac smearing 0.05 eV, spin-polarised, cell height 20 Å.
-- Base model MACE omat-0, fine-tuned on 68 carbon rows and 36 Ar scans, keeping the Ar element.
-- Force error on impact frames against DFT: 0.417 eV/Å for the Ar-aware MACE model, 1.107 eV/Å for AIREBO+ZBL.
+*Figure 3. AIREBO Stone-Wales formation energy in a 5×5 cell for eleven runs. The runs fall in two groups with different ripple amplitude (z spread). DFT gives 5.54 eV.*
 
-### Stage C: paired Ar impacts
+**Conclusion of stage A.** AIREBO mis-ranks defects that differ in bonding topology, and its potential energy surface has spurious structure. A simulation that uses it will shift defect populations and thresholds, not only noise them.
 
-Same small sheet, same impacts, AIREBO+ZBL against fine-tuned MACE.
+## 4. Stages B and C: fine-tuning and Ar impacts
 
-- Ar vacancy threshold at the top site: MACE below 50 eV, AIREBO 50 to 55 eV.
-- The gap follows the carbon displacement threshold: AIREBO 25 to 26 eV, MACE 20 to 21 eV (experiment-based value about 21 eV).
-- A static DFT push scan shows an AIREBO C-C cutoff artefact.
-- Frame test (14 DFT frames): force RMSE 1.69 eV/Å (AIREBO) against 0.51 eV/Å (MACE).
-- Not proven: the MACE Ar thresholds themselves, because DFT frames do not go below Ar-C 1.6 Å.
+The Ar-aware fine-tuned model was trained on 68 carbon rows and 36 Ar scans. On DFT-labelled impact frames its force error is 0.42 eV/Å, against 1.11 eV/Å for AIREBO+ZBL.
 
-### Stage D: nitrogen
+In paired Ar impacts on the same sheet, the Ar vacancy threshold at the top site is below 50 eV for MACE and 50 to 55 eV for AIREBO. This follows the carbon displacement threshold: 20 to 21 eV for MACE, 25 to 26 eV for AIREBO, and about 21 eV from experiment-based estimates. A frame test on 14 DFT frames gives a force RMSE of 1.69 eV/Å for AIREBO against 0.51 eV/Å for MACE.
 
-AIREBO has no N parameters in this setup, so DFT is the only independent check. The work is an iterative loop: run impacts, label selected frames with DFT, retrain, test on whole impacts that were never in the training set.
+A binary-collision estimate puts these numbers in perspective. Head-on, Ar (40 u) can transfer at most 71 % of its energy to a carbon atom (12 u), so reaching a displacement threshold of 20.5 eV needs about 29 eV, and 25.5 eV needs about 36 eV. The ordering agrees with the MD: AIREBO needs about 25 % more. The absolute value does not: the MD threshold of 50 to 55 eV for AIREBO is about 40 % above the head-on estimate. The likely reasons are the three-fold bonding of the struck atom, impacts that are not head-on, and an Ar atom that keeps pushing while the carbon leaves. I did not separate these.
 
-![loop](figures/fig2_loop.png)
+**Conclusion of stages B and C.** The fine-tuned model is much closer to DFT on impact frames, and the shift of the threshold is explained by the displacement energy of carbon. What is *not* shown is that the MACE Ar thresholds themselves are right, because DFT frames do not go below Ar-C 1.6 Å. Any yield curve computed with AIREBO, including my own Graphene-Defect-Engineering-MD repository, should be read with a threshold that is probably 20 % too high.
 
-Force error on the N atom (eV/Å) on held-out whole impacts:
+## 5. Stage D: nitrogen
+
+### 5.1 Two problems in the labels
+
+Two problems in the data had to be fixed before any model could be trusted.
+
+**Magnetic free atoms.** When a carbon atom is sputtered, the DFT frame contains a free atom. Free carbon is a triplet, 1.27 eV below its non-magnetic state; the calculation oscillates, lands in metastable states with ±4 µB and fails. The periodic 20 Å cell also wraps distant atoms back into the sheet. Frames are therefore sanitised: carbon atoms more than 7 Å from the sheet, or more than 2.3 Å from every other atom, are removed. The MD itself is not affected.
+
+**An unstable N₂ reference.** Formation energies of N-containing defects are measured against N₂, a closed-shell triple-bonded molecule that looks nothing like the sheet data. With a single N₂ row in the training set, the error of the N₂ reference energy jumped between retrains, from 2.4 to 56.9 meV/atom (Figure 6). Nine DFT N₂ frames (bond 1.02 to 1.35 Å, heights 3.5 to 7 Å) reduced it to 7.5 meV/atom for n10.
+
+![Figure 6: N2 reference error](figures/fig5_n2_reference.png)
+
+*Figure 6. Error of the N₂ reference energy across model versions. It jumps between retrains while N₂ is a single training row and settles once nine DFT frames are added.*
+
+### 5.2 How well does the model do on unseen impacts?
+
+Figure 4 shows the force error on the N atom for the five models on four test sets, all made of whole impacts.
+
+![Figure 4: test errors](figures/fig3_test_errors.png)
+
+*Figure 4. Force error on the N atom (norm/√3 convention) on held-out impact frames. Training data grow from n6 to n10.*
 
 | Test set | n6 | n7 | n8 | n9 | n10 |
 |---|---|---|---|---|---|
@@ -64,123 +98,68 @@ Force error on the N atom (eV/Å) on held-out whole impacts:
 | dense_test (10, hollow) | 0.718 | 0.186 | 0.208 | 0.213 | 0.236 |
 | val2 (10) | 1.080 | 0.362 | 0.346 | 0.363 | 0.349 |
 
+h34 holds the frames of impact runs r3 and r4; late_clean holds four late-time frames; dense_test holds hollow-site frames; val2 is a second validation set.
 
-Test sets (whole impacts, because frames of one impact are 5 fs apart and nearly identical):
-- **h34**: 17 frames from impact runs r3 and r4, held out of training.
-- **late_clean**: 4 late-time frames. Only 4 frames, so an indication, not a statistic.
-- **dense_test**: 10 hollow-site frames.
-- **val2**: 10 frames of a second validation set.
+Three readings follow.
 
-A data leak was found and corrected: the original `late_test` set had 9 frames, and 5 of them had been added to the n9/n10 training data by the h34 split script. Their `late_test` errors (0.163 and 0.165 eV/Å) were therefore not held-out numbers. `late_clean` keeps only the 4 frames absent from every training set; there n9/n10 give 0.23 eV/Å, against 0.27 to 0.37 for n6 to n8. The gain on this set is real but smaller than first reported, and with 4 frames it is within noise of n6. h34 (0 of 17 frames in training), dense_test and val2 are clean.
+- Adding dense hollow-site frames at n7 cuts the hollow error from 0.72 to 0.19 and the val2 error from 1.08 to 0.36. This is the largest gain in the whole study, and it comes from data, not from a better model.
+- n9 and n10 improve on h34 (0.43 against 0.46 to 0.51). This is the clean evidence of progress between n8 and n10.
+- On near-contact top and bridge frames, all models stay at 0.4 to 0.5 eV/Å. Between 0.15 and 0.3 eV/Å of that is the difference between spin-polarised and unpolarised DFT labels, which a model that does not see spin cannot resolve.
 
-![test errors](figures/fig3_test_errors.png)
+**A data leak, found and corrected.** The original `late_test` set had nine frames. The script that created the h34 split also read that database as a source, so five of its frames ended up in the training data of n9 and n10. Their `late_test` errors (0.163 and 0.165 eV/Å) were therefore not held-out numbers. The corrected set `late_clean` keeps the four frames that are in no training set. There, n9 and n10 give 0.23 eV/Å against 0.27 to 0.37 for n6 to n8, a gain that is real against n7 and n8 but within noise against n6. h34, dense_test and val2 have no overlap with any training set.
 
-Outcome of 5 impacts per case with the final model (n10):
+### 5.3 What happens in an impact
 
-![outcomes](figures/fig4_outcomes_n10.png)
+Figure 5 shows the outcome of five impacts per case with the final model, for three impact sites and three energies.
 
-- Top site, 20 to 50 eV: N is always bound in-plane, one C atom is ejected. Same in all five models.
-- Hollow site, 30 and 50 eV: N is always transmitted. Same in all five models.
-- Bridge site, 50 eV: mostly transmitted.
-- Bridge site, 20 eV: depends on the model (bound in n6 and n10, reflected in n7 and n8). No probability is quoted.
+![Figure 5: outcomes of N impacts](figures/fig4_outcomes_n10.png)
 
-### Problems found and fixed along the way
+*Figure 5. Outcome of five N impacts per case with n10: bound in the sheet, transmitted through it, or reflected.*
 
-- **Magnetic free carbon atoms.** A sputtered C atom in a DFT frame is a free magnetic atom. It makes the SCF oscillate, gives metastable ±4 µB states and failed jobs. Frames are now sanitised: C atoms farther than 7 Å from the sheet, or more than 2.3 Å from every other atom, are removed before labelling.
-- **Unstable N₂ reference energy.** With one N₂ row in the training set, the reference energy jumped between retrains. Nine DFT N₂ frames fixed it.
+- **Top site (20, 30 and 50 eV): N always ends up in the lattice with three carbon neighbours, and the struck carbon atom is ejected.** All five models agree. A head-on N (14 u) passes about 99 % of its energy to C (12 u), so at 20 eV it is just at the MACE displacement threshold of 20 to 21 eV. The attraction between N and C (the N gains its chemisorption energy before contact, and forms a new bond as the carbon leaves) makes the exit cheaper than for a bare carbon recoil. This is substitutional doping by knock-on, and the displacement threshold of carbon is not the threshold for N substitution.
+- **Hollow site: transmitted at 30 and 50 eV, mostly bound at 20 eV.** The effective barrier for pushing N through the ring is therefore between 20 and 30 eV. No carbon atom is ejected. This is the best-validated channel, because the minimum N-C distance (1.14 to 1.54 Å at 20 eV, 1.27 to 1.40 Å above) stays inside the DFT-labelled region.
+- **Bridge site: depends on the energy and the model.** At 50 eV most impacts (4 of 5 with n10) are transmitted. At 30 eV a bound state is the majority. At 20 eV the outcome depends on the model: n6 and n10 give mostly bound, n7 and n8 mostly reflected. These cases sit where the kinetic energy is close to the barrier, and a force error of 0.4 to 0.5 eV/Å over about 0.3 Å is 0.1 to 0.15 eV, about the size of the margin. The model dependence reflects a small energy margin, not chaos, and it means no probability can be quoted.
 
-![N2](figures/fig5_n2_reference.png)
+### 5.4 Chemistry of N in the sheet
 
-## Critical analysis: what the results mean physically, and what they do not
+The model is good at impacts and poor at ranking N configurations. Formation-energy errors against DFT (MACE minus DFT, unrelaxed structures, eV): N adatom at a bridge site −0.50, at a top site −0.27, graphitic N −0.23, V1+1N −0.23, V1+2N +0.15, V1+3N +0.31, V2+2N −0.26, V2+4N +0.43. The sign changes between structures, so no single offset fixes them, and in DFT the relative energies of graphitic N, pyridinic N and adatoms are within about 1 eV, so errors of 0.2 to 0.5 eV can reorder them. These are errors on structures that are in the training set, because training used all data, which points to underfitting or conflicting labels, not to extrapolation. Spin is a candidate (vacancies and adatoms are magnetic, graphitic N is not), but I did not test it. **The model should not be used to rank N configurations thermodynamically.**
 
-Each statement is tagged **measured** (a number in this repository), **inferred** (follows from measured numbers plus standard physics, not tested here) or **untested** (a hypothesis). Where a claim rests on the notes only, the table or figure above is the evidence.
+## 6. What this study does not show
 
-### 1. Why AIREBO fails where it fails
+- **The most useful channel is the least validated.** Top-site impacts, which produce graphitic N, pass through N-C distances of 0.85 to 1.04 Å, below the 1.1 Å limit for DFT frames. The 1.1 Å limit is a practical choice: the plane-wave cutoff and the PAW datasets were not designed for these distances, and it has not been checked with a harder setup or an all-electron code.
+- **The committee is not independent.** Models n6 to n10 share the base model, the architecture and heavily overlapping data. Their agreement on the top and hollow outcomes shows stability against retraining, not agreement between independent methods.
+- **One adiabatic surface.** The dynamics follow a neutral, single-spin-state potential energy surface. A real collision can change spin surface, and a real beam is charged and neutralised close to the sheet. At 20 to 50 eV nuclear stopping dominates, but nothing here tests the rest.
+- **Sampling.** One incidence angle, three high-symmetry impact points, five runs per case. A cross-section needs the full impact-parameter map and thermal sampling. The sheet is free-standing, so there is no substrate.
+- **Time window.** Outcomes are classified at the end of a short run. Diffusion of adatoms, reconstruction of vacancies and recombination of ejected atoms are not covered.
+- **The MD sheet is strained.** It was built with a lattice constant of 2.46 Å and not relaxed with AIREBO (about 1.7 % strain compared to the AIREBO value near 2.42 Å). I did not measure the effect on the thresholds.
 
-- **Over-stabilised adatoms and interstitial-like defects (measured).** The adatom formation energy is 2.23 eV too low and the Frenkel pair 0.93 eV too high in the AIREBO − DFT convention, while V2 is 0.67 eV too high. Errors of this size are not a fitting detail: they say that AIREBO mis-ranks defects that differ in bonding topology (sp³-like adatom bonds against dangling bonds at vacancies).
-- **Likely cause (inferred).** Bond-order potentials switch the C-C interaction off over a fixed distance window (about 1.7 to 2.0 Å in AIREBO). A displaced atom that sits in that window feels a switching-function artefact instead of a real bond. This is the known cutoff problem of Tersoff/Brenner-type potentials (Pastewka et al., Phys. Rev. B 78, 161402, 2008, to be checked against the AIREBO case). The static DFT push scan shows the same artefact as a force error at those distances. I have not removed the switching function to prove it is the sole cause.
-- **Two rippled Stone-Wales minima (measured).** DFT has one flat structure at 5.54 eV in a 5×5 cell. A 5×5 cell is small, so 5.54 eV is a finite-size value, not the isolated-defect energy; the comparison is fair because both methods use the same cell, but neither number should be quoted as *the* Stone-Wales energy.
-- **Consequence for published AIREBO results (inferred).** If a potential makes displacement harder (see 2) and adatoms too stable, yield curves and defect populations computed with it are shifted in energy and in defect type. This includes the Ar yield curves of my Graphene-Defect-Engineering-MD repository, which should be read with a threshold shift of about 20 %.
-
-### 2. Displacement threshold: a simple check on the Ar result
-
-For a head-on elastic collision the largest energy a projectile of mass *m₁* can give a carbon atom is γ·E, with γ = 4 m₁ m₂ / (m₁ + m₂)².
-
-| Projectile | γ (to C) | Energy for 20.5 eV on C (MACE) | Energy for 25.5 eV on C (AIREBO) |
-|---|---|---|---|
-| Ar | 0.71 | about 29 eV | about 36 eV |
-| N | 0.99 | about 21 eV | about 26 eV |
-
-- **The ordering agrees (inferred).** AIREBO needs a larger kick than MACE, and the gap of about 25 % between the two displacement thresholds is the gap seen between the Ar vacancy thresholds (50 to 55 eV against below 50 eV). This supports the explanation of Stage C: the Ar threshold difference comes from the C displacement threshold, not from the Ar-C repulsion.
-- **The absolute values do not agree (measured against inferred).** The head-on estimate gives about 36 eV for AIREBO, but the MD vacancy threshold is 50 to 55 eV. A head-on, instantaneous, two-body collision underestimates the threshold by roughly 40 %. The likely reasons are that the struck atom is bonded to three neighbours (a larger effective mass), that impacts are not head-on, and that the Ar keeps pushing while the C leaves. I have not separated these contributions.
-- **Experiment is not a clean benchmark (inferred).** Measured and DFT-MD displacement thresholds for graphene cluster around 21 to 23 eV, but they depend on temperature, direction and the definition of "displaced" (see for example the temperature study at arXiv:1811.04011). A match of MACE (20 to 21 eV) with experiment is encouraging, not proof.
-
-### 3. Nitrogen: what the three sites actually test
-
-- **Top site: replacement collision (inferred).** N (14 u) is nearly the same mass as C (12 u), so it passes about 99 % of its energy head-on. At 20 eV that is just at the MACE displacement threshold, yet the C atom is ejected in all runs and N ends up with 3 C neighbours. The extra energy comes from the attraction: the N gains the chemisorption energy before contact, and the N-C bond that forms as the C leaves makes the exit cheaper than for a bare C recoil. This is chemistry, not a purely kinematic effect, and it means the displacement threshold of C is not the threshold for N substitution.
-- **Top site is the least validated channel (measured).** It runs through N-C distances of 0.85 to 1.04 Å, below the 1.1 Å DFT-trusted limit. The channel that produces graphitic N, the product people want, is the one that DFT never checked.
-- **Hollow site: the best-validated channel (measured).** The minimum N-C distance is 1.14 to 1.54 Å, inside the labelled region, and the hollow test error is 0.19 to 0.24 eV/Å. The outcome changes between 20 eV (mostly bound) and 30 eV (always transmitted): the effective barrier for pushing N through the hexagon is therefore between 20 and 30 eV. This is the most solid physical statement of Stage D, but it only says that the sheet is transparent to 30 eV N at the ring centre, not that real irradiation of graphene transmits most ions.
-- **Bridge site at 20 to 30 eV: marginal cases (inferred).** The outcome flips between models where the kinetic energy is close to the barrier. A force error of 0.4 to 0.5 eV/Å over about 0.3 Å is 0.1 to 0.15 eV, small compared with the beam energy but of the order of the margin that decides a marginal case. Model dependence there reflects a small energy margin, not chaotic failure, and it does not mean the physics is unknowable. It does mean that no probability can be quoted.
-- **The committee is not independent (inferred).** n6 to n10 share the same base model, the same architecture and heavily overlapping data. Their agreement on top and hollow shows stability against retraining, not agreement between independent methods. A real uncertainty estimate needs different seeds, a different base model, or a different method.
-
-### 4. Chemistry of N in the sheet
-
-- **Formation energies are off in a systematic direction (measured).** MACE − DFT is −0.50 eV (N adatom, bridge), −0.27 (adatom, top), −0.23 (graphitic N), −0.23 (V1+1N), +0.15, +0.31 (V1+2N, V1+3N) and −0.26 and +0.43 (V2+2N, V2+4N). The sign changes between structures, so a single offset would not fix them. The relative energies of graphitic, pyridinic and adatom N are typically within about 1 eV in DFT, so an error of 0.2 to 0.5 eV can reorder them. **Do not use this model to rank N configurations thermodynamically.**
-- **Not a held-out error (measured).** Training used all data (validation rows are copies), so these are errors on structures the model was fitted to. Large errors on training structures point to underfitting or conflicting labels, not to extrapolation. Spin is a candidate (V1 and adatoms are magnetic, graphitic N is not) but I did not test it.
-- **Pyridinic N (untested).** Multi-N vacancy structures are where the model is worst. Pyridinic N has an in-plane lone pair and a reconstructed vacancy; both are electronic effects that a short-range local model can fit only if the training set contains enough examples. It probably does not.
-- **The N₂ reference (measured, with a physical reason inferred).** A closed-shell triple-bonded molecule in vacuum is a bonding environment unlike anything in the sheet data. With one row in the training set, the model extrapolates to it, and the error moved between 2.4 and 56.9 meV/atom from one retrain to the next. At 56.9 meV/atom the reference shifts a formation energy by 0.06 eV per N atom, or 0.23 eV for V2+4N, the same size as the other errors. 7.5 meV/atom (n10) removes this contribution but not the structural errors above.
-
-### 5. Limits of the physics model itself
-
-- **Spin (measured floor).** Spin-polarised and unpolarised labels differ by 0.25 to 0.5 eV/Å near contact. The MLIP learns one of the two branches; a real collision can end on a different spin surface. Free C (triplet) and N (quartet) atoms make this relevant exactly in the ejection channels.
-- **Born-Oppenheimer and charge (untested).** The dynamics follow a single adiabatic, neutral surface. At 20 to 50 eV nuclear stopping dominates and electronic excitation is small, but real ion beams are charged and neutralised close to the surface. Nothing here tests that, and for a reactive ion like N it could matter near the threshold.
-- **DFT as the reference (untested).** PBE, the 450 eV plane-wave cutoff and the PAW datasets were not designed for N-C distances below 1.1 Å; the 1.1 Å limit is a practical choice and has not been verified with a harder setup or an all-electron code. PBE also overbinds N₂ by about 0.5 eV per molecule; this cancels in a MACE-against-DFT comparison but not against experiment.
-- **Geometry and sampling (inferred).** One incidence angle, three high-symmetry impact points, five runs per case. A cross-section needs the full impact-parameter map and thermal sampling. The sheet is free-standing: a substrate adds backscattering, a heat sink and charge transfer.
-- **Time window (inferred).** Outcomes are classified at the end of a short run. Adatom diffusion, vacancy reconstruction and recombination of ejected atoms over longer times are not covered.
-
-### 6. Tests that would settle the open points
+## 7. What would settle the open points
 
 In order of value for effort:
-1. DFT frames below 1.1 Å with a harder PAW setup or an all-electron code, to find the real validity limit and to label the top-site channel.
+
+1. DFT frames below 1.1 Å with a harder PAW setup or an all-electron code, to find the real validity limit and label the top-site channel.
 2. An independent uncertainty estimate: a second foundation model or different seeds, compared on the same impacts.
-3. Spin-resolved check of the ejection channel: run the same frames with fixed total moments and compare forces.
-4. Impact-parameter map for N with thermal sampling, to turn channels into cross-sections.
-5. Remove the AIREBO switching function (or use a screened variant) to see whether the Stage A errors and the threshold shift disappear.
-6. Compare thresholds and yields with published ion-irradiation MD of graphene (for example Lehtinen et al., Phys. Rev. B 81, 153401, 2010) and with experiment.
-
-## Limitations
-
-1. Top-site and 50 eV bridge impacts pass through N-C distances below 1.1 Å, the shortest distance labelled by DFT. Forces there are not verified.
-2. Labels are spin-polarised and the model does not see spin. This leaves an error of 0.25 to 0.5 eV/Å on near-contact frames, whatever the model.
-3. Five runs per case, one set of seeds: outcomes are not probabilities.
-4. Formation energies of structures with several N atoms are off by 0.3 to 0.4 eV. Single-N values are within about 0.5 eV (unrelaxed structures).
-5. There is no AIREBO comparison for N.
-6. The MD sheet was built with a 2.46 Å lattice constant and was not relaxed with AIREBO (about 1.7 % strain compared to the AIREBO value near 2.42 Å). Its effect on the thresholds has not been measured.
+3. A spin-resolved check of the ejection channel: the same frames with fixed total moments.
+4. An impact-parameter map for N with thermal sampling, to turn channels into cross-sections.
+5. A test without the AIREBO switching function (or with a screened variant), to see whether the stage A errors and the threshold shift disappear.
+6. A comparison of thresholds and yields with published ion-irradiation MD of graphene (for example Lehtinen et al., Phys. Rev. B 81, 153401, 2010) and with experiment. Measured and DFT-MD displacement thresholds depend on temperature and on the definition of "displaced" (see arXiv:1811.04011), so agreement within a couple of eV is the realistic target.
 
 ## Repository layout
 
 ```
 stageA_dft_check/       AIREBO against DFT defect energies, result tables (CSV)
 stageB_mace_training/   fine-tuning, DFT labelling workflow, impact tests, stage notes
-  STAGE_A..D_*.md       detailed result notes
+  STAGE_A..D_*.md       detailed result notes with all numbers
   data/**/labelled*.db  DFT-labelled ASE databases (training and test frames)
-figures/                figures and the script that makes them (make_figs.py)
+figures/                the figures and the script that makes them (make_figs.py)
 ```
 
-The notes `STAGE_A_RESULTS.md` to `STAGE_D_RESULTS.md` hold the full numbers and the reasoning.
+Not included: model weights, trajectories, logs and the AIREBO potential file. The fine-tuned model is built on MACE omat-0; check the licence of the base model before redistributing weights.
 
-## Not included
+Tools: GPAW, ASE, LAMMPS (AIREBO, ZBL), MACE, Python.
 
-Model weights, trajectories, logs and the AIREBO potential file are not part of the repository. The fine-tuned model is built on MACE-MP omat-0; check the licence of the base model before redistributing weights.
-
-## Tools
-
-GPAW, ASE, LAMMPS (AIREBO, ZBL), MACE, Python.
-
-## Licence
+## Licence and author
 
 MIT, see `LICENSE`.
 
-## Author
-
-Safouan Ziat, Ph.D. (GitHub: safouanziat)
+Safouan Ziat, Ph.D. · GitHub: safouanziat
