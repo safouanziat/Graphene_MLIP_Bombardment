@@ -1,0 +1,5 @@
+model n10
+h34         frames  17  force RMSE all atoms 0.154 eV/A  N force error 0.426  energy MAE 4.3 meV/atom  max |dE| 23.1
+late_clean  frames   4  force RMSE all atoms 0.086 eV/A  N force error 0.232  energy MAE 1.9 meV/atom  max |dE| 3.5
+dense_test  frames  10  force RMSE all atoms 0.093 eV/A  N force error 0.236  energy MAE 4.8 meV/atom  max |dE| 7.2
+val2        frames  10  force RMSE all atoms 0.116 eV/A  N force error 0.349  energy MAE 5.6 meV/atom  max |dE| 7.1
