@@ -26,9 +26,9 @@ plt.rcParams.update({"font.family": ["DejaVu Sans"], "font.size": 10, "axes.spin
                      "axes.edgecolor": "#4a5b6b", "axes.labelcolor": "#14202b", "xtick.color": "#14202b", "ytick.color": "#14202b",
                      "text.color": "#14202b", "figure.facecolor": "white", "axes.facecolor": "white"})
 INK, MUTE, BLUE, ORG, GREY, RED, TEAL = "#14202b", "#4a5b6b", "#2b5d8a", "#b8741a", "#9aa5b1", "#b23a48", "#2a8c82"
-SETS = {"h34": "data/nimpact_h34/labelled.db", "late_clean": "data/nimpact_late_clean/labelled.db",
+SETS = {"h34": "data/nimpact_h34/labelled.db", 
         "dense_test": "data/nimpact_dense_test/labelled.db", "val2": "data/nimpact_val2/labelled.db"}
-SETCOL = {"h34": BLUE, "late_clean": ORG, "dense_test": TEAL, "val2": RED}
+SETCOL = {"h34": BLUE, "dense_test": TEAL, "val2": RED}
 TRAIN = {"Ar scans": "data/arscan/labelled.db", "N scans": "data/nscan/labelled.db", "N defects": "data/ndefects/labelled.db",
          "N impacts (v6)": "data/nimpact/labelled_impacts_all_v6.db"}
 
@@ -174,7 +174,9 @@ fig.savefig(out / "fig13_label_coverage.png", dpi=200, bbox_inches="tight"); plt
 
 # ---------------------------------------------------------------- fig 14: gallery of DFT frames along impacts
 cand = sorted([r for r in rows if r["iN"] and np.isfinite(r["d"])], key=lambda r: r["d"])
-pick = [cand[int(q * (len(cand) - 1))] for q in (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)] if cand else []
+_ce = sorted([r for r in cand if np.isfinite(r["fN_err"])], key=lambda r: -r["fN_err"])
+_lo = sorted([r for r in _ce if r["d"] <= 1.45], key=lambda r: r["fN_err"])[:2]
+pick = (_ce[:4] + _lo) if len(_ce) >= 6 and len(_lo) == 2 else []
 COL = {"C": GREY, "N": BLUE, "Ar": TEAL}
 fig, axs = plt.subplots(2, len(pick), figsize=(2.7 * len(pick), 5.6), gridspec_kw={"height_ratios": [1, 0.7]})
 for k, r in enumerate(pick):
@@ -198,7 +200,7 @@ for k, r in enumerate(pick):
     sx.set_aspect("equal"); sx.set_xlim(-R, R); sx.set_ylim(-4.5, 4.5); sx.axis("off")
     ax.set_title(f"{r['set']}\nN-C {r['d']:.2f} Å", fontsize=9.5, fontweight="bold")
     sx.text(0, -4.6, f"N force error {r['fN_err']:.2f} eV/Å", ha="center", va="top", fontsize=8.5, color=RED if r["fN_err"] > 0.4 else MUTE)
-fig.suptitle("DFT-labelled test frames of N impacts, from closest to farthest approach (top view above, side view below; grey C, blue N)",
+fig.suptitle("DFT-labelled test frames of N impacts, the four largest N force errors, then the two smallest at N-C up to 1.45 Å (top view above, side view below; grey C, blue N)",
              x=0.01, ha="left", fontsize=11, fontweight="bold")
 fig.savefig(out / "fig14_dft_frames.png", dpi=200, bbox_inches="tight"); plt.close(fig)
 
