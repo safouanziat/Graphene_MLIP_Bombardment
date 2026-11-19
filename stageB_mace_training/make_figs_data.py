@@ -93,7 +93,8 @@ ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_aspect("equal")
 rm = np.sqrt(((fM - fD) ** 2).mean())
 ax.set_xlabel("DFT force component (eV/Å)"); ax.set_ylabel(f"MACE {a.tag} force component (eV/Å)")
 ax.set_title("All atoms, all test frames", loc="left", fontsize=12, fontweight="bold")
-ax.text(0.04, 0.95, f"RMSE {rm:.3f} eV/Å\n{len(fD)//3} atoms", transform=ax.transAxes, va="top", fontsize=9.5)
+r2 = 1 - ((fM - fD) ** 2).sum() / ((fD - fD.mean()) ** 2).sum()
+ax.text(0.04, 0.95, f"R² = {r2:.3f}\nRMSE = {rm:.3f} eV/Å\nMAE = {np.abs(fM - fD).mean():.3f} eV/Å\nbias = {(fM - fD).mean():+.3f} eV/Å\n{len(fD)//3} atoms", transform=ax.transAxes, va="top", fontsize=9.5)
 fig.colorbar(hb, ax=ax, label="count (log)", shrink=0.7)
 
 ax = axs[1]
@@ -111,6 +112,9 @@ ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_aspect("equal")
 ax.set_xlabel("DFT force component on the N (eV/Å)"); ax.set_ylabel("MACE force component on the N (eV/Å)")
 ax.set_title("N atom, by test set", loc="left", fontsize=12, fontweight="bold")
 ax.legend(frameon=False, fontsize=9, loc="lower right")
+dN = ys - xs
+r2N = 1 - (dN ** 2).sum() / ((xs - xs.mean()) ** 2).sum()
+ax.text(0.04, 0.95, f"R² = {r2N:.3f}\nRMSE = {np.sqrt((dN ** 2).mean()):.3f} eV/Å\nMAE = {np.abs(dN).mean():.3f} eV/Å\nbias = {dN.mean():+.3f} eV/Å\n{len(xs)//3} N atoms", transform=ax.transAxes, va="top", fontsize=9.5)
 
 ax = axs[2]
 for k, name in enumerate(SETS):
@@ -122,6 +126,8 @@ ax.axhline(0, color=INK, lw=0.8)
 ax.set_xticks(range(len(SETS))); ax.set_xticklabels(list(SETS))
 ax.set_ylabel("MACE − DFT energy (meV/atom)")
 ax.set_title("Energy error per frame", loc="left", fontsize=12, fontweight="bold")
+dE = np.array([(r["eM"] - r["eD"]) / r["n"] * 1000 for r in rows])
+ax.text(0.97, 0.95, f"MAE = {np.abs(dE).mean():.1f} meV/atom\nbias = {dE.mean():+.1f} meV/atom\nmax |error| = {np.abs(dE).max():.1f}\n{len(dE)} frames", transform=ax.transAxes, va="top", ha="right", fontsize=9.5)
 ax.yaxis.grid(True, color="#e3e8ee"); ax.set_axisbelow(True)
 fig.suptitle(f"Held-out impact frames: MACE {a.tag} against DFT (whole impacts in no training set)", x=0.01, ha="left", fontsize=13, fontweight="bold", y=1.02)
 fig.savefig(out / "fig11_parity.png", dpi=200, bbox_inches="tight"); plt.close(fig)
